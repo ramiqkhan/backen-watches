@@ -18,16 +18,26 @@ import orderRoutes from './routes/orderRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import saleRoutes from './routes/saleRoutes.js';
-import watchStrapRoutes from './routes/watchStrapRoutes.js'; // <-- Import watch strap routes
-const app = express();
+import watchStrapRoutes from './routes/watchStrapRoutes.js'; 
 
-// Connect to Database
-connectDB();
+const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+// Serverless Database Connection Middleware
+// Ensures connection is awaited before any API request executes on Vercel
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    res.status(500).json({ success: false, message: 'Database connection failed' });
+  }
+});
 
 // Routes
 app.use('/api/watches', watchRoutes);
@@ -35,7 +45,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/sales', saleRoutes);
-app.use('/api/watch-straps', watchStrapRoutes); // <-- Mount watch strap routes here
+app.use('/api/watch-straps', watchStrapRoutes);
+
 // Root Route
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running smoothly!' });
@@ -56,4 +67,5 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
 export default app;
