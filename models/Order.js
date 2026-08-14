@@ -12,12 +12,20 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: false
   },
-  orderItems: [
+ orderItems: [
     {
       watch: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Watch',
         required: true
+      },
+      name: { 
+        type: String, 
+        required: true 
+      },
+      image: { 
+     type: String, // <--- MUST be explicitly defined as String
+    required: [true, "Image is required"] 
       },
       quantity: {
         type: Number,

@@ -1,5 +1,21 @@
 import Order from '../models/Order.js';
 import Watch from '../models/Watch.js';
+import Strap from '../models/WatchStrap.js';
+
+const fetchProductAcrossCollections = async (productId) => {
+  if (!productId) return null;
+  if (typeof productId === 'object' && productId !== null) return productId;
+
+  try {
+    let product = await Watch.findById(productId).lean();
+    if (!product) {
+      product = await Strap.findById(productId).lean();
+    }
+    return product;
+  } catch (err) {
+    return null;
+  }
+};
 
 const orderService = {
   createOrder: async (orderData) => {
@@ -12,19 +28,31 @@ const orderService = {
     let calculatedTotalPrice = 0;
     const verifiedOrderItems = [];
 
-    for (const item of orderItems) {
-      const watch = await Watch.findById(item.watch);
-      if (!watch) {
-        throw new Error(`Watch with ID ${item.watch} not found`);
+  for (const item of orderItems) {
+      const productId = item.watch || item.productId;
+      const product = await fetchProductAcrossCollections(productId);
+
+      if (!product) {
+        throw new Error(`Item with ID ${productId} not found in product collections`);
       }
 
+      // Safely resolve the image string from multiple fallback locations
+      const resolvedImage = 
+        product.image || 
+        product.imageUrl || 
+        product.img || 
+        item.image || 
+        "https://via.placeholder.com/150";
+
       verifiedOrderItems.push({
-        watch: watch._id,
+        watch: product._id,
+        name: product.name,
+        image: typeof resolvedImage === "string" ? resolvedImage : resolvedImage.url || "https://via.placeholder.com/150",
         quantity: item.quantity,
-        price: watch.price
+        price: product.price
       });
 
-      calculatedTotalPrice += watch.price * item.quantity;
+      calculatedTotalPrice += product.price * item.quantity;
     }
 
     let orderId;
@@ -51,15 +79,21 @@ const orderService = {
   },
 
   getOrderById: async (id) => {
-    const order = await Order.findById(id).populate('orderItems.watch', 'name brand images price');
+    const order = await Order.findById(id).populate('user', 'email fullName').lean();
     if (!order) throw new Error('Order not found');
+
+    for (let item of order.orderItems) {
+      const product = await fetchProductAcrossCollections(item.watch);
+      item.watch = product || { name: 'Unknown / Deleted Product', price: item.price };
+    }
+
     return order;
   },
 
   getOrderByTrackingId: async (orderId, queryParam) => {
     const order = await Order.findOne({ 
       orderId: orderId.toUpperCase() 
-    }).populate('orderItems.watch', 'name brand images price');
+    }).populate('user', 'email fullName').lean();
 
     if (!order) {
       throw new Error('Order not found with the provided Order ID');
@@ -72,11 +106,36 @@ const orderService = {
       throw new Error('Contact information (email or phone) does not match this order');
     }
 
+    for (let item of order.orderItems) {
+      const product = await fetchProductAcrossCollections(item.watch);
+      item.watch = product || { name: 'Unknown / Deleted Product', price: item.price };
+    }
+
     return order;
   },
 
   getAllOrders: async () => {
-    return await Order.find({}).populate('orderItems.watch', 'name brand price');
+    const orders = await Order.find({}).lean();
+
+    const enrichedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const enrichedItems = await Promise.all(
+          (order.orderItems || []).map(async (item) => {
+            const product = await fetchProductAcrossCollections(item.watch);
+            return {
+              ...item,
+              watch: product || { name: 'Unknown / Deleted Product', price: item.price }
+            };
+          })
+        );
+        return {
+          ...order,
+          orderItems: enrichedItems
+        };
+      })
+    );
+
+    return enrichedOrders;
   },
 
   updateOrderToPaid: async (id, paymentResult) => {

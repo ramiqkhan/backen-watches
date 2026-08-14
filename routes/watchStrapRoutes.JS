@@ -1,12 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { 
-  createStrap, 
-  getAllStraps, 
-  getStrapsByType, 
-  updateStrap, 
-  deleteStrap 
-} from '../controllers/watchStrapController.js'; // <-- Make sure '.js' is here
+import watchStrapController from '../controllers/watchStrapController.js';
 
 const router = express.Router();
 
@@ -14,15 +8,12 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Route definitions with Multer image upload middleware included
-router.route('/')
-  .get(getAllStraps)
-  .post(upload.array('images', 5), createStrap);
+// Standalone route definitions
+router.get('/', watchStrapController.getWatchStraps);
+router.post('/', upload.array('images', 5), watchStrapController.createWatchStrap);
 
-router.get('/style/:strapType', getStrapsByType);
-
-router.route('/:id')
-  .put(upload.array('images', 5), updateStrap)
-  .delete(deleteStrap);
+router.get('/:id', watchStrapController.getWatchStrapById);
+router.put('/:id', upload.array('images', 5), watchStrapController.updateWatchStrap);
+router.delete('/:id', watchStrapController.deleteWatchStrap);
 
 export default router;

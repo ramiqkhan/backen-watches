@@ -15,7 +15,10 @@ const watchStrapSchema = new mongoose.Schema({
       url: { type: String }
     }
   ],
-  stock: { type: Number, default: 10 }
+  stock: { type: Number, default: 10 },
+  isBestSeller: { type: Boolean, default: false },
+  specifications: { type: mongoose.Schema.Types.Mixed, default: {} }
 }, { timestamps: true });
 
-export default mongoose.model('WatchStrap', watchStrapSchema);
+const WatchStrap = mongoose.model('WatchStrap', watchStrapSchema);
+export default WatchStrap;
